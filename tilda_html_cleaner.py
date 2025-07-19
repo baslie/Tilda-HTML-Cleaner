@@ -101,6 +101,15 @@ def detect_encoding(filepath):
     # Если ничего не подошло, используем utf-8 с игнорированием ошибок
     return 'utf-8'
 
+def create_backup_filename(original_path):
+    """
+    Создает имя файла для резервной копии
+    """
+    path = Path(original_path)
+    # Добавляем "_copy" перед расширением
+    new_name = f"{path.stem}_copy{path.suffix}"
+    return path.parent / new_name
+
 def process_html_files():
     """
     Обрабатывает все HTML файлы в текущей директории
@@ -109,10 +118,13 @@ def process_html_files():
     script_dir = Path(__file__).parent
     
     # Ищем все HTML файлы в директории (не рекурсивно)
-    html_files = list(script_dir.glob('*.html')) + list(script_dir.glob('*.htm'))
+    # Исключаем файлы с суффиксом "_copy", чтобы не обрабатывать уже обработанные файлы
+    all_html_files = list(script_dir.glob('*.html')) + list(script_dir.glob('*.htm'))
+    html_files = [f for f in all_html_files if '_copy' not in f.stem]
     
     if not html_files:
         print("HTML файлы не найдены в текущей директории.")
+        print("(файлы с суффиксом '_copy' игнорируются)")
         return
     
     processed_count = 0
@@ -120,6 +132,9 @@ def process_html_files():
     for html_file in html_files:
         try:
             print(f"Обрабатывается файл: {html_file.name}")
+            
+            # Создаем имя для очищенного файла
+            cleaned_file = create_backup_filename(html_file)
             
             # Определяем кодировку
             encoding = detect_encoding(html_file)
@@ -135,8 +150,8 @@ def process_html_files():
             # Очищаем контент
             cleaned_content = clean_html(content)
             
-            # Сохраняем результат
-            with open(html_file, 'w', encoding='utf-8', errors='replace') as f:
+            # Сохраняем очищенный файл с суффиксом "_copy"
+            with open(cleaned_file, 'w', encoding='utf-8', errors='replace') as f:
                 f.write(cleaned_content)
             
             # Статистика
@@ -144,13 +159,17 @@ def process_html_files():
             reduction = original_size - new_size
             reduction_percent = (reduction / original_size * 100) if original_size > 0 else 0
             
-            print(f"  ✓ Обработан! Размер уменьшился на {reduction} символов ({reduction_percent:.1f}%)")
+            print(f"  ✓ Создан очищенный файл: {cleaned_file.name}")
+            print(f"  ✓ Размер уменьшился на {reduction} символов ({reduction_percent:.1f}%)")
             processed_count += 1
             
         except Exception as e:
             print(f"  ✗ Ошибка при обработке {html_file.name}: {str(e)}")
     
     print(f"\nОбработано файлов: {processed_count} из {len(html_files)}")
+    if processed_count > 0:
+        print(f"Оригинальные файлы сохранены без изменений.")
+        print(f"Очищенные версии сохранены с суффиксом '_copy'.")
 
 if __name__ == "__main__":
     print("Скрипт очистки HTML файлов")
